@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, } = require("@discordjs/voice");
 const youtube = require('@yimura/scraper');
 const fs = require('fs');
@@ -23,6 +23,19 @@ client.on('ready', () => {
 
 const queue = new Map(); // For queue
 
+const HelpEmbed = new EmbedBuilder()
+  .setTitle("Help Menu")
+  .setDescription("These are all the available commands. Use \"!\" as the prefix")
+  .addFields(
+    { name: "help", value: "Displays this message" },
+    { name: "ping", value: "Sends the API and bot ping" },
+    { name: "play (link)", value: "Plays the attached link" },
+    { name: "skip/stop", value: "Both commands skip to the next song" },
+    { name: "queue", value: "Sends the current song queue" },
+    { name: "clear", value: "Clears the song queue" },
+    { name: "search (query)", value: "Plays the first Youtube result for the query" },
+  )
+
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
   if (!message.content.startsWith(prefix)) return;
@@ -30,26 +43,31 @@ client.on('messageCreate', async (message) => {
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  if (command === "ping") { // Ping command
-    message.channel.send('Loading data').then(async (msg) => {
-      msg.edit(`🏓Latency is ${msg.createdTimestamp - message.createdTimestamp}ms. API Latency is ${Math.round(client.ws.ping)}ms`);
-    });
+  try {
+    if (command === "ping") { // Ping command
+      message.channel.send('Loading data').then(async (msg) => {
+        msg.edit(`🏓Latency is ${msg.createdTimestamp - message.createdTimestamp}ms. API Latency is ${Math.round(client.ws.ping)}ms`);
+      });
+    } else if (command === 'play') {
+      execute(message, args, queue);
+    } else if (command === 'skip') {
+      skip(message, queue);
+    } else if (command === 'stop') {
+      stop(message, queue);
+    } else if (command === 'queue') {
+      showQueue(message, queue);
+    } else if (command === 'clear') {
+      clearQueue(message, queue);
+    } else if (command === 'search') {
+      const searchQuery = args.join(' ');
+      searchYouTube(message, searchQuery, queue);
+    } else if (command === 'help') {
+      message.channel.send({ embeds: [HelpEmbed] })
+    }
+  } catch (error) {
+    message.channel.send("Command experienced an error.")
+    console.log(error)
   }
-    else if (command === 'play') {
-    execute(message, args, queue);
-  } else if (command === 'skip') {
-    skip(message, queue);
-  } else if (command === 'stop') {
-    stop(message, queue);
-  } else if (command === 'queue') {
-    showQueue(message, queue);
-  } else if (command === 'clear') {
-    clearQueue(message, queue);
-  } else if (command === 'search') {
-    const searchQuery = args.join(' ');
-    searchYouTube(message, searchQuery, queue);
-  }  
-  
 });
 
 async function execute(message, args, queue) {
