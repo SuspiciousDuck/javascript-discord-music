@@ -34,6 +34,7 @@ const HelpEmbed = new EmbedBuilder()
     { name: "queue", value: "Sends the current song queue" },
     { name: "clear", value: "Clears the song queue" },
     { name: "search (query)", value: "Plays the first Youtube result for the query" },
+    { name: "loop", value: "Toggles loop on the current song" }
   )
 
 client.on('messageCreate', async (message) => {
@@ -49,6 +50,10 @@ client.on('messageCreate', async (message) => {
         msg.edit(`🏓Latency is ${msg.createdTimestamp - message.createdTimestamp}ms. API Latency is ${Math.round(client.ws.ping)}ms`);
       });
     } else if (command === 'play') {
+      if (args === undefined || args.length === 0) {
+        message.channel.send("Please include a link")
+        return
+      }
       execute(message, args, queue);
     } else if (command === 'skip') {
       skip(message, queue);
@@ -59,10 +64,16 @@ client.on('messageCreate', async (message) => {
     } else if (command === 'clear') {
       clearQueue(message, queue);
     } else if (command === 'search') {
+      if (args === undefined || args.length === 0) {
+        message.channel.send("Please include a link")
+        return
+      }
       const searchQuery = args.join(' ');
       searchYouTube(message, searchQuery, queue);
     } else if (command === 'help') {
       message.channel.send({ embeds: [HelpEmbed] })
+    } else if (command === 'loop') {
+      toggleLoop(message,queue)
     }
   } catch (error) {
     message.channel.send("Command experienced an error.")
@@ -99,6 +110,7 @@ async function execute(message, args, queue) {
       connection: null,
       songs: [],
       playing: true,
+      loop: false,
     };
     queue.set(message.guild.id, queueConstruct);
     queueConstruct.songs.push(song);
@@ -149,10 +161,16 @@ async function play(guild, song, queue) {
 
   player.on('error', (error) => console.error(error));
   player.on('idle', () => {
-    serverQueue.songs.shift();
-    play(guild, serverQueue.songs[0], queue);
+    if (serverQueue.loop) {
+      // If loop is enabled, play the current song again
+      play(guild, serverQueue.songs[0], queue);
+    } else {
+      // If loop is disabled, remove the current song and play the next one
+      serverQueue.songs.shift();
+      play(guild, serverQueue.songs[0], queue);
+    }
   });
-
+  
   await player.play(resource);
   connection.subscribe(player);
   serverQueue.textChannel.send(`Start playing: **${song.title}**`);
@@ -218,6 +236,15 @@ async function searchYouTube(message, searchQuery, queue) {
     console.error('Error fetching search results:', err);
     message.channel.send("Error fetching search results")
   }
+}
+
+function toggleLoop(message, queue) {
+  const serverQueue = queue.get(message.guild.id);
+  if (!serverQueue) {
+    return message.channel.send('There is nothing playing to loop.');
+  }
+  serverQueue.loop = !serverQueue.loop; // Toggle loop status
+  return message.channel.send(`Loop is now ${serverQueue.loop ? 'enabled' : 'disabled'}.`);
 }
 
 client.login(TOKEN);
