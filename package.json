@@ -1,0 +1,20 @@
+{
+  "name": "javascript-discord-music",
+  "version": "1.0.0",
+  "description": "My Discord music bot in Javascript.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js"
+  },
+  "author": "SuspiciousDuck",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/opus": "github:discordjs/opus",
+    "@discordjs/voice": "^0.16.0",
+    "@yimura/scraper": "^1.2.4",
+    "discord.js": "^14.9.0",
+    "fs": "^0.0.1-security",
+    "libsodium-wrappers": "^0.7.11",
+    "ytdl-core": "^4.11.4"
+  }
+}
