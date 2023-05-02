@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, } = require("@discordjs/voice");
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, } = require("@discordjs/voice");
 const youtube = require('@yimura/scraper');
 const fs = require('fs');
 const TOKEN = fs.readFileSync('token.txt', 'utf8');
@@ -21,6 +21,16 @@ client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
 });
 
+function isValidHttpUrl(string) {
+  let url;
+  try {
+    url = new URL(string);
+  } catch (_) {
+    return false;
+  }
+  return url.protocol === "http:" || url.protocol === "https:";
+}
+
 const queue = new Map(); // For queue
 
 const HelpEmbed = new EmbedBuilder()
@@ -40,7 +50,7 @@ const HelpEmbed = new EmbedBuilder()
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
   if (!message.content.startsWith(prefix)) return;
-
+ 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
@@ -50,8 +60,10 @@ client.on('messageCreate', async (message) => {
         msg.edit(`🏓Latency is ${msg.createdTimestamp - message.createdTimestamp}ms. API Latency is ${Math.round(client.ws.ping)}ms`);
       });
     } else if (command === 'play') {
-      if (args === undefined || args.length === 0) {
-        message.channel.send("Please include a link")
+      if (args === undefined || args.length === 0) { message.channel.send("Please include a link")
+        return }
+      if (!isValidHttpUrl(args[0])) {
+        message.channel.send("Please include a valid link")
         return
       }
       execute(message, args, queue);
@@ -74,6 +86,8 @@ client.on('messageCreate', async (message) => {
       message.channel.send({ embeds: [HelpEmbed] })
     } else if (command === 'loop') {
       toggleLoop(message,queue)
+    } else if (command === 'pause' || command === 'resume') {
+      pause(message,queue)
     }
   } catch (error) {
     message.channel.send("Command experienced an error.")
@@ -195,9 +209,6 @@ function stop(message, queue) {
   if (!message.member.voice.channel) return message.channel.send('You have to be in a voice channel to stop the music!');
   if (!serverQueue) return message.channel.send('There is no song playing that I could stop!');
   serverQueue.songs = [];
-  if (serverQueue.connection && serverQueue.connection._player) {
-    serverQueue.connection._player.stop();
-  }
   serverQueue.connection.disconnect();
   queue.delete(message.guild.id);
 }
@@ -245,6 +256,20 @@ function toggleLoop(message, queue) {
   }
   serverQueue.loop = !serverQueue.loop; // Toggle loop status
   return message.channel.send(`Loop is now ${serverQueue.loop ? 'enabled' : 'disabled'}.`);
+}
+
+function pause(message, queue) {
+  const serverQueue = queue.get(message.guild.id);
+  if (!message.member.voice.channel) return message.channel.send('You have to be in a voice channel to pause the music!');
+  if (!serverQueue) return message.channel.send('There is no song playing that I could pause!');
+  const connection = getVoiceConnection(message.guildId);
+  if (connection.state.subscription.player.state.status === AudioPlayerStatus.Paused) {
+    connection.state.subscription.player.unpause();
+    message.channel.send("Resumed")
+  } else {
+    connection.state.subscription.player.pause();
+    message.channel.send("Paused")
+  }
 }
 
 client.login(TOKEN);
